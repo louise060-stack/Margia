@@ -219,7 +219,15 @@ function deferralType(text: string): import('../src/types.ts').ProtectedType {
   return 'DEFERRAL';
 }
 
-export function planFromOnboarding(answers: OnboardingAnswers): PlanInput {
+/** Optional real inputs: her actual calendar events + the real week they fall in. */
+export interface OnboardingContext {
+  /** her real imported calendar events (from Google), replacing the modelled anchors */
+  imported?: FlexibleEvent[];
+  /** the ISO Monday of her real current week */
+  weekStartISO?: string;
+}
+
+export function planFromOnboarding(answers: OnboardingAnswers, ctx: OnboardingContext = {}): PlanInput {
   const availability = windowsFor(answers.availability);
   const label = answers.deferral.trim() || 'Your run';
 
@@ -242,10 +250,16 @@ export function planFromOnboarding(answers: OnboardingAnswers): PlanInput {
     screeningRecords: [], // no dates collected in onboarding; age-appropriate gaps surface as never-done
   };
 
+  // Her real calendar (when connected) replaces the modelled anchors as the
+  // week's fixed logistics. The household chores stay — they're Margia's layer,
+  // not Google's, and they're the raw material the choreography engine needs to
+  // manufacture margin. So: her real events + Margia's household tasks.
+  const importedLogistics = ctx.imported ?? [...fixedAnchors, soccer];
+
   return {
-    weekStartISO: '2026-07-20',
+    weekStartISO: ctx.weekStartISO ?? '2026-07-20',
     profile: profileFromAnswers,
-    flexible: [...fixedAnchors, soccer, ...householdEvents],
+    flexible: [...importedLogistics, ...householdEvents],
     checklist: demoChecklist, // cervical nudge cleared, to demonstrate the health voice
   };
 }
