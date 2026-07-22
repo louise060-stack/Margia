@@ -131,7 +131,7 @@ function WeekRibbon({ plan, protDays, heroDay }: { plan: WeeklyPlan; protDays: S
   return (
     <div className="wribbon" role="list" aria-label="Your week at a glance">
       {DAY_INITIAL.map((ini, d) => (
-        
+       <a 
           key={d}
           role="listitem"
           href={`#day-${d}`}
