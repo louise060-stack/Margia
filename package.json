@@ -1,0 +1,20 @@
+{
+  "name": "margia",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Margia — a protection engine with a point of view, for working mothers. A margin of your own.",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "test:engine": "node --import tsx --test packages/engine/test/*.test.ts",
+    "demo:engine": "node --import tsx packages/engine/test/demo.ts",
+    "dev": "npm --workspace apps/web run dev",
+    "build": "npm --workspace apps/web run build"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}
