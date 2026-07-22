@@ -290,8 +290,8 @@ body {
 .legend .sw { display: inline-flex; align-items: center; gap: 6px; }
 .legend .swatch { width: 22px; height: 12px; border-radius: 4px; }
 .legend .swatch.prot { background: var(--slot-protected-fill); border-left: 4px solid var(--slot-protected-bar); box-shadow: var(--shadow-soft); }
-.legend .swatch.flex { border: 1.5px dashed var(--slot-flexible-border); }
-.legend .swatch.held { background: var(--color-held); border: 1px dashed var(--color-accent-soft); }
+.legend .swatch.flex { background: rgba(200, 106, 70, 0.05); border: 1px solid rgba(99, 48, 79, 0.16); }
+.legend .swatch.held { background: rgba(231, 180, 155, 0.30); border-left: 3px solid var(--color-wink); }
 
 .grid {
   display: grid;
@@ -357,11 +357,14 @@ body {
   color: var(--slot-protected-ink-soft); opacity: 0.85; margin-top: 2px;
 }
 
+/* Flexible logistics — soft, warm, clearly moveable. No cold dashes (they
+   dominated the screen and read "unfinished to-do app"). A barest clay tint +
+   a solid hairline says: this moves around you. */
 .block.flex {
-  background: transparent;
-  border: 1.5px dashed var(--slot-flexible-border);
+  background: rgba(200, 106, 70, 0.05);
+  border: 1px solid rgba(99, 48, 79, 0.16);
 }
-.block.flex .lab { font-size: 12px; font-weight: 500; color: var(--slot-flexible-ink); line-height: 1.2; }
+.block.flex .lab { font-size: 12px; font-weight: 500; color: var(--color-anchor-soft); line-height: 1.2; }
 .block.flex .tm { font-size: 10px; color: var(--color-muted); font-variant-numeric: tabular-nums; }
 .block .origin {
   position: absolute; top: 6px; right: 6px;
@@ -380,10 +383,13 @@ body {
 }
 .corun .spin { color: var(--color-accent); }
 
-/* the DRAWN margin — "held open, on purpose" */
+/* the DRAWN margin — "held open, on purpose". The payoff of the whole mechanic,
+   so it's a felt warm wash with a marigold rule (echoing the protected edge),
+   not a faint ghost. */
 .block.held {
-  background: var(--color-held);
-  border: 1px dashed var(--color-accent-soft);
+  background: rgba(231, 180, 155, 0.30);
+  border: none;
+  border-left: 3px solid var(--color-wink);
   display: flex; align-items: center; justify-content: center;
   text-align: center;
 }
@@ -392,7 +398,7 @@ body {
   font-style: italic;
   font-size: 12px;
   color: var(--color-accent);
-  opacity: 0.9;
+  opacity: 1;
 }
 
 /* --- health nudge: sober, plain, cited. Serif. Planning state only. --- */
@@ -698,3 +704,156 @@ body {
 .ob-reveal { max-width: 1120px; }
 .ob-reveal-actions { display: flex; flex-direction: column; align-items: center; gap: var(--space-3); margin-top: var(--space-6); }
 .btn.big { min-width: 240px; min-height: 52px; display: inline-flex; align-items: center; justify-content: center; font-size: 16px; text-decoration: none; }
+
+/* ===========================================================================
+   The week — responsive. Desktop = time grid; mobile = vertical agenda +
+   a sticky week-shape ribbon. One component set, two containers (Sofia).
+   =========================================================================== */
+
+/* the week-shape ribbon — glanceable "shape of my week", gold dot = protected day */
+.wribbon {
+  display: flex;
+  gap: 6px;
+  padding: 4px 2px 14px;
+  margin-bottom: var(--space-2);
+}
+.wpill {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 2px 10px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-line);
+  text-decoration: none;
+  position: relative;
+  transition: transform var(--motion-fast) var(--motion-settle);
+}
+.wpill:active { transform: translateY(1px); }
+.wpill-d { font-size: 12px; font-weight: 600; color: var(--color-text-soft); }
+.wpill-n { font-size: 11px; color: var(--color-muted); }
+.wpill.today { background: var(--slot-protected-fill); border-color: transparent; box-shadow: var(--shadow-soft); }
+.wpill.today .wpill-d { color: var(--slot-protected-ink); }
+.wpill.today .wpill-n { color: var(--slot-protected-ink-soft); }
+.wpill-dot { position: absolute; bottom: 5px; width: 6px; height: 6px; border-radius: 50%; background: var(--color-wink); }
+
+/* default: show desktop grid, hide mobile agenda */
+.week-mobile { display: none; }
+.week-desktop { display: block; }
+
+/* --- mobile agenda --- */
+.agenda { display: flex; flex-direction: column; gap: var(--space-4); }
+.aday { scroll-margin-top: 12px; }
+.aday-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  padding: 0 2px var(--space-2);
+  border-bottom: 1px solid var(--color-line);
+  margin-bottom: var(--space-3);
+}
+.aday.today .aday-name { color: var(--color-accent); }
+.aday-name { font-family: var(--font-voice); font-size: 18px; font-weight: 500; color: var(--color-anchor); }
+.aday-date { font-size: 12px; color: var(--color-muted); }
+.aday-empty { font-family: var(--font-voice); font-style: italic; color: var(--color-muted); font-size: 14px; margin: 0 0 2px 2px; }
+.aday-items { display: flex; flex-direction: column; gap: var(--space-2); }
+
+.arow { display: flex; gap: var(--space-3); align-items: stretch; border-radius: var(--radius-md); padding: 12px 14px; animation: settle var(--motion-base) var(--motion-settle) both; }
+.arow-time { flex: 0 0 52px; font-size: 12px; font-variant-numeric: tabular-nums; padding-top: 2px; }
+.arow-body { flex: 1; min-width: 0; }
+.arow-lab { font-size: 15px; line-height: 1.25; display: flex; align-items: center; gap: 7px; }
+.arow-sub { font-size: 11.5px; margin-top: 2px; }
+
+/* protected — the hero: a full, warm mulberry block, marigold edge + label */
+.arow.prot {
+  background: var(--slot-protected-fill);
+  border-left: 4px solid var(--slot-protected-bar);
+  box-shadow: var(--shadow-lift);
+}
+.arow.prot .arow-time { color: var(--slot-protected-ink-soft); }
+.arow.prot .arow-lab { font-family: var(--font-voice); font-weight: 600; color: var(--slot-protected-ink); }
+.arow.prot .arow-sub { color: var(--slot-protected-ink-soft); text-transform: lowercase; letter-spacing: 0.02em; }
+
+/* flexible — soft, moveable, warm; no cold dashes */
+.arow.flex {
+  background: rgba(200, 106, 70, 0.05);
+  border: 1px solid rgba(99, 48, 79, 0.14);
+}
+.arow.flex .arow-time { color: var(--color-muted); }
+.arow.flex .arow-lab { font-weight: 500; color: var(--color-anchor-soft); }
+
+/* held-open margin — the felt, earned wink */
+.arow.held {
+  background: rgba(231, 180, 155, 0.30);
+  border-left: 3px solid var(--color-wink);
+}
+.arow.held .arow-time { color: var(--color-accent); }
+.arow.held .held-lab { font-family: var(--font-voice); font-style: italic; color: var(--color-accent); }
+.arow.held .arow-sub { color: var(--color-accent); opacity: 0.8; }
+
+.arow .origin { flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; }
+
+@media (max-width: 767px) {
+  .week-desktop { display: none; }
+  .week-mobile { display: block; }
+  .weekwrap { overflow-x: visible; padding: var(--space-3); }
+  .weekhead .legend { font-size: 11px; gap: var(--space-2) var(--space-3); }
+  .wribbon { position: sticky; top: 0; z-index: 5; background: var(--color-surface); padding-top: 10px; }
+}
+
+/* ===========================================================================
+   Onboarding corrections (live-test panel): backward nav + tap-only steppers.
+   =========================================================================== */
+
+/* back navigation — a quiet chevron, out of the fat-finger zone (top-left) */
+.ob-topnav { display: flex; align-items: center; gap: var(--space-4); margin-bottom: var(--space-6); }
+.ob-topnav .ob-dots { margin-bottom: 0; }
+.ob-back {
+  background: none; border: none; cursor: pointer;
+  color: var(--color-text-soft); font-family: var(--font-ui); font-size: 14px; font-weight: 500;
+  padding: 6px 4px; margin-left: -4px;
+  transition: color var(--motion-fast) var(--motion-settle);
+}
+.ob-back:hover { color: var(--color-anchor); }
+
+/* tappable answer chips in the assembling panel — correcting an answer is a demo */
+.ob-slot { display: block; width: 100%; text-align: left; border: none; font-family: inherit; }
+.ob-slot.tappable { cursor: pointer; transition: transform var(--motion-fast) var(--motion-settle); }
+.ob-slot.tappable:hover { transform: translateX(2px); }
+.ob-slot:disabled { cursor: default; }
+.ob-slot.ghost { background: var(--color-surface-2); }
+
+/* kid count chips */
+.ob-count { display: flex; gap: var(--space-3); margin-bottom: var(--space-5); }
+.ob-countchip {
+  flex: 1; min-height: 52px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-line);
+  color: var(--color-text);
+  font-family: var(--font-ui); font-size: 18px; font-weight: 500;
+  cursor: pointer;
+  transition: all var(--motion-fast) var(--motion-settle);
+}
+.ob-countchip.sel { background: var(--color-anchor); color: var(--color-ground); border-color: var(--color-anchor); }
+
+/* per-child + her age — tap-only steppers */
+.ob-kidages { display: flex; flex-direction: column; gap: var(--space-3); margin-bottom: var(--space-2); }
+.ob-stepper-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 4px;
+}
+.ob-stepper-lab { font-family: var(--font-voice); font-size: 17px; color: var(--color-anchor); }
+.ob-stepper { display: flex; align-items: center; gap: var(--space-3); }
+.ob-step {
+  width: 44px; height: 44px; border-radius: 50%;
+  background: var(--color-surface); border: 1.5px solid var(--color-line);
+  color: var(--color-anchor); font-size: 22px; line-height: 1; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all var(--motion-fast) var(--motion-settle);
+}
+.ob-step:hover { border-color: var(--color-accent); }
+.ob-step:active { transform: scale(0.94); }
+.ob-step-val { min-width: 64px; text-align: center; font-size: 20px; color: var(--color-text); }
+.ob-step-suffix { font-size: 13px; color: var(--color-muted); margin-left: 3px; }
