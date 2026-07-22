@@ -208,3 +208,50 @@ export function choreograph(
     if (bg) bg.choreography_reason = surfacedMove.reason;
     trace.push(`Choreography · surfaced ONE move with reasoning shown (V1 scope: one eureka, not a suite)`);
   } else {
+    trace.push(`Choreography · no clean background-under-foreground move available this week`);
+  }
+
+  return { flexible, protected: protectedOut, surfacedMove, marginMinutes, trace };
+}
+
+function pickBenefitingProtected(
+  slots: ProtectedSlot[],
+  freed: TimeBlock,
+): ProtectedSlot | undefined {
+  const placed = slots.filter((s) => s.placement);
+  // The most on-message beneficiary is the thing she keeps deferring, on the
+  // same day the margin was freed — her run finally has room around it.
+  const sameDayMove = placed.find(
+    (s) => s.placement!.day === freed.day && (s.type === 'DEFERRAL' || s.type === 'MOVEMENT'),
+  );
+  if (sameDayMove) return sameDayMove;
+  // else a protected slot physically adjacent to the freed block
+  const adjacent = placed.find(
+    (s) => abuts(s.placement!, freed) || overlaps(s.placement!, freed) || sameDayNear(s.placement!, freed),
+  );
+  if (adjacent) return adjacent;
+  // else the thing she keeps deferring, else any movement slot, anywhere
+  return placed.find((s) => s.type === 'DEFERRAL') ?? placed.find((s) => s.type === 'MOVEMENT');
+}
+
+function sameDayNear(a: TimeBlock, b: TimeBlock): boolean {
+  return a.day === b.day && Math.abs(a.start - b.end) <= 60 && Math.abs(b.start - a.end) <= 240;
+}
+
+/**
+ * Build the ONE human-readable line from the ACTUAL attach decision. Never a
+ * canned template — it names the real tasks, the real freed block, and the real
+ * protected slot that benefits, in the warm serif voice.
+ */
+function buildReason(
+  bg: FlexibleEvent,
+  anchor: Anchor,
+  freed: TimeBlock,
+  benefiting: ProtectedSlot,
+): string {
+  const bgName = bg.label.toLowerCase();
+  const anchorName = anchor.label.toLowerCase();
+  const window = `${fmt(freed.start)}–${fmt(freed.end)}`;
+  const dn = dayName(freed.day);
+  return `I set the ${bgName} to run under ${anchorName}, which clears ${dn} ${window} — so ${benefiting.label.toLowerCase()} has room to breathe instead of a chore stacked on it.`;
+}
