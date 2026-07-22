@@ -151,4 +151,230 @@ export const DEFAULT_CHECKLIST: ScreeningDefinition[] = [
 // Gap detection
 // ---------------------------------------------------------------------------
 
-fun
+function monthsBetween(fromISO: string, toISO: string): number {
+  const from = new Date(fromISO);
+  const to = new Date(toISO);
+  return (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth());
+}
+
+/**
+ * Compute her screening gaps against the checklist, respecting age gates and
+ * the nudge_enabled flag. Returns overdue / due-soon / never-done items; the
+ * plan surfaces AT MOST ONE, and only one whose nudge is enabled, and only in
+ * the rested Sunday-Planning state.
+ */
+export function computeGaps(
+  age: number,
+  records: ScreeningRecord[],
+  checklist: ScreeningDefinition[],
+  todayISO: string,
+): ScreeningGap[] {
+  const byId = new Map(records.map((r) => [r.id, r] as const));
+  const gaps: ScreeningGap[] = [];
+
+  for (const def of checklist) {
+    if (age < def.min_age || age > def.max_age) {
+      gaps.push({
+        id: def.id,
+        label: def.label,
+        status: 'not_applicable',
+        months_overdue: 0,
+        guideline_source: def.guideline_source,
+        nudge_enabled: def.nudge_enabled,
+      });
+      continue;
+    }
+
+    const rec = byId.get(def.id);
+    if (!rec || rec.last_done === null) {
+      gaps.push({
+        id: def.id,
+        label: def.label,
+        status: 'never_done',
+        months_overdue: 0,
+        guideline_source: def.guideline_source,
+        nudge_enabled: def.nudge_enabled,
+      });
+      continue;
+    }
+
+    const elapsed = monthsBetween(rec.last_done, todayISO);
+    const overdueBy = elapsed - def.interval_months;
+    let status: GapStatus = 'ok';
+    if (overdueBy > 0) status = 'overdue';
+    else if (overdueBy > -2) status = 'due_soon';
+
+    gaps.push({
+      id: def.id,
+      label: def.label,
+      status,
+      months_overdue: Math.max(0, overdueBy),
+      guideline_source: def.guideline_source,
+      nudge_enabled: def.nudge_enabled,
+    });
+  }
+
+  return gaps;
+}
+
+export interface HealthNudge {
+  screeningId: ScreeningId;
+  label: string;
+  /** filled template — sober, plain, cited. Serif voice, Planning state ONLY. */
+  copy: string;
+  guideline_source: string;
+  /** the tentative slot the nudge offers ("want Thursday at 9?") */
+  offeredSlotLabel: string;
+}
+
+/**
+ * Build the ONE health nudge to surface, from the most-overdue gap whose nudge
+ * is ENABLED. Returns null if nothing is both overdue and cleared for nudging —
+ * which is the correct, safe default before clinical sign-off.
+ *
+ * The copy is a filled template. It never references or corrects a prior
+ * recommendation, never alarms, always cites, and is only ever shown in the
+ * rested Sunday-Planning state (the caller enforces the state).
+ */
+export function buildHealthNudge(
+  gaps: ScreeningGap[],
+  records: ScreeningRecord[],
+  checklist: ScreeningDefinition[],
+  offeredSlotLabel: string,
+  todayISO: string,
+): HealthNudge | null {
+  const enabledOverdue = gaps
+    .filter((g) => (g.status === 'overdue' || g.status === 'never_done') && g.nudge_enabled)
+    .sort((a, b) => b.months_overdue - a.months_overdue);
+
+  const top = enabledOverdue[0];
+  if (!top) return null;
+
+  const def = checklist.find((d) => d.id === top.id)!;
+  const rec = records.find((r) => r.id === top.id);
+  const years = top.months_overdue >= 12 ? `${Math.floor((top.months_overdue + def.interval_months) / 12)} years` : 'a year';
+  const elapsedYears = rec?.last_done ? Math.floor(monthsBetween(rec.last_done, todayISO) / 12) : 0;
+  const duration = rec?.last_done
+    ? `${elapsedYears || 1} year${elapsedYears > 1 ? 's' : ''}`
+    : 'a while';
+
+  const copy = def.nudge_copy_template
+    .replace('{name}', '')
+    .replace('{years}', years)
+    .replace('{duration}', duration)
+    .replace('{slot}', offeredSlotLabel);
+
+  return {
+    screeningId: top.id,
+    label: top.label,
+    copy,
+    guideline_source: top.guideline_source,
+    offeredSlotLabel,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// THE UPDATE MECHANISM — the living document (6A.3)
+// ---------------------------------------------------------------------------
+
+/** One append-only audit entry. This is the record that protects the founder. */
+export interface ChecklistHistoryEntry {
+  screeningId: ScreeningId;
+  field: keyof ScreeningDefinition;
+  previous_value: string | number | boolean;
+  new_value: string | number | boolean;
+  changed_at: string; // ISO timestamp — passed in, never generated internally
+  reviewer: string; // named human
+  reason: string;
+  guideline_effective_date: string; // the guideline's date, NOT the app-update date
+}
+
+export interface ChecklistChange {
+  screeningId: ScreeningId;
+  field: keyof ScreeningDefinition;
+  new_value: string | number | boolean;
+  changed_at: string;
+  reviewer: string;
+  reason: string;
+  guideline_effective_date: string;
+}
+
+/**
+ * Apply a guideline change to the checklist AS DATA and append to the audit
+ * trail. No code deploy, no engineering ticket. Returns a NEW checklist and a
+ * NEW history array (pure — nothing mutated in place), mirroring the Supabase
+ * table + append-only history-trigger design.
+ */
+export function applyChecklistChange(
+  checklist: ScreeningDefinition[],
+  history: ChecklistHistoryEntry[],
+  change: ChecklistChange,
+): { checklist: ScreeningDefinition[]; history: ChecklistHistoryEntry[] } {
+  const nextChecklist = checklist.map((def) => {
+    if (def.id !== change.screeningId) return def;
+    return { ...def, [change.field]: change.new_value } as ScreeningDefinition;
+  });
+
+  const target = checklist.find((d) => d.id === change.screeningId);
+  const entry: ChecklistHistoryEntry = {
+    screeningId: change.screeningId,
+    field: change.field,
+    previous_value: (target ? (target[change.field] as string | number | boolean) : ''),
+    new_value: change.new_value,
+    changed_at: change.changed_at,
+    reviewer: change.reviewer,
+    reason: change.reason,
+    guideline_effective_date: change.guideline_effective_date,
+  };
+
+  return { checklist: nextChecklist, history: [...history, entry] };
+}
+
+export interface UserForRescore {
+  userId: string;
+  age: number;
+  records: ScreeningRecord[];
+}
+
+export interface RescoreResult {
+  userId: string;
+  gaps: ScreeningGap[];
+  /** ids that became newly overdue as a result of the change */
+  newlyInGap: ScreeningId[];
+}
+
+/**
+ * Re-score every user against the (possibly updated) checklist. When an interval
+ * changes, some users flip into or out of gap. This is the propagation job
+ * (Section 7.7 rescore_all_users) — built from day one so a guideline change
+ * actually reaches users' plans.
+ */
+export function rescoreAllUsers(
+  users: UserForRescore[],
+  previousChecklist: ScreeningDefinition[],
+  nextChecklist: ScreeningDefinition[],
+  todayISO: string,
+): RescoreResult[] {
+  return users.map((u) => {
+    const before = computeGaps(u.age, u.records, previousChecklist, todayISO);
+    const after = computeGaps(u.age, u.records, nextChecklist, todayISO);
+    const wasGap = new Set(before.filter((g) => g.status === 'overdue').map((g) => g.id));
+    const newlyInGap = after
+      .filter((g) => g.status === 'overdue' && !wasGap.has(g.id))
+      .map((g) => g.id);
+    return { userId: u.userId, gaps: after, newlyInGap };
+  });
+}
+
+/**
+ * The forward-facing change notice (Section 7). Uses the guideline's effective
+ * date, NEVER references or corrects a prior recommendation, no clinical
+ * rationale, no alarm. Day-one information notice; the standard nudge follows on
+ * day two (caller schedules that).
+ */
+export function buildChangeNotice(
+  def: ScreeningDefinition,
+  guidelineEffectiveMonthYear: string,
+): string {
+  return `${def.label} guidance was updated ${guidelineEffectiveMonthYear}. Based on your age, we've added a check to your plan.`;
+}
