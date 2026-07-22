@@ -1,0 +1,11 @@
+{
+  "name": "@margia/engine",
+  "version": "0.1.0",
+  "description": "The Margia protection + choreography engine. The owned asset: inverted-default two-pass placement, the choreography solver, and the per-user learning store. Surface-agnostic — the front end calls it, never contains it.",
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./seed": "./seed/sampleWeek.ts"
+  }
+}
