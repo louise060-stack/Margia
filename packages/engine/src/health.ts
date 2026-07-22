@@ -91,7 +91,7 @@ export const DEFAULT_CHECKLIST: ScreeningDefinition[] = [
     last_reviewed: '2026-07-01',
     next_review: '2026-10-01',
     nudge_copy_template:
-      "Your smear isn't on the calendar and it's been over {years} — want {slot}?",
+      "Your cervical screening has slipped past its usual window — worth easing back onto your radar when you're ready. It's a call you make with your GP, not something I can book, but I can hold you a quiet ten minutes this week to sort it.",
     nudge_enabled: false, // gated until clinical sign-off
   },
   {
